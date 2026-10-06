@@ -1,3 +1,5 @@
+import webpush from "web-push";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
