@@ -1,172 +1,475 @@
-import webpush from "web-push";
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+    <title>Моя напоминалка</title>
 
-    // CORS
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type"
-        }
-      });
-    }
-
-    // Проверка Worker
-    if (url.pathname === "/") {
-      return new Response("Напоминалка работает 💊");
-    }
-
-    // Public VAPID key
-    if (url.pathname === "/vapid-public-key") {
-      return new Response(env.VAPID_PUBLIC_KEY, {
-        headers: {
-          "Content-Type": "text/plain",
-          "Access-Control-Allow-Origin": "*"
-        }
-      });
-    }
-
-    // Сохранение подписки iPhone
-    if (url.pathname === "/subscribe" && request.method === "POST") {
-      try {
-        const subscription = await request.json();
-
-        console.log("SUBSCRIBE: подписка получена");
-
-        await env.REMINDERS.put(
-          "subscription",
-          JSON.stringify(subscription)
-        );
-
-        console.log("SUBSCRIBE: подписка сохранена");
-
-        return new Response("Подписка сохранена", {
-          status: 200,
-          headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "text/plain"
-          }
-        });
-
-      } catch (error) {
-        console.error("SUBSCRIBE ERROR:", error);
-
-        return new Response(
-          "Ошибка сохранения подписки: " + error.message,
-          {
-            status: 500,
-            headers: {
-              "Access-Control-Allow-Origin": "*"
-            }
-          }
-        );
-      }
-    }
-
-    // Сохранение лекарств
-    if (url.pathname === "/medicines" && request.method === "POST") {
-      try {
-        const data = await request.json();
-
-        await env.REMINDERS.put(
-          "medicines",
-          JSON.stringify(data)
-        );
-
-        console.log("MEDICINES: сохранено");
-
-        return new Response("Напоминания сохранены", {
-          status: 200,
-          headers: {
-            "Access-Control-Allow-Origin": "*"
-          }
-        });
-
-      } catch (error) {
-        console.error("MEDICINES ERROR:", error);
-
-        return new Response(
-          "Ошибка сохранения: " + error.message,
-          {
-            status: 500,
-            headers: {
-              "Access-Control-Allow-Origin": "*"
-            }
-          }
-        );
-      }
-    }
-
-    // Тест серверного уведомления
-    if (url.pathname === "/test-push") {
-      try {
-        const subscriptionData =
-          await env.REMINDERS.get("subscription");
-
-        if (!subscriptionData) {
-          return new Response(
-            "Подписка не найдена в KV",
-            {
-              status: 404,
-              headers: {
-                "Access-Control-Allow-Origin": "*"
-              }
-            }
-          );
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f2f6ff;
+            text-align: center;
+            padding: 30px;
         }
 
-        const subscription =
-          JSON.parse(subscriptionData);
+        .container {
+            max-width: 400px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+        }
 
-        webpush.setVapidDetails(
-          "mailto:test@example.com",
-          env.VAPID_PUBLIC_KEY,
-          env.VAPID_PRIVATE_KEY
-        );
+        input, button {
+            width: 90%;
+            padding: 12px;
+            margin: 8px;
+            border-radius: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
 
-        await webpush.sendNotification(
-          subscription,
-          JSON.stringify({
-            title: "💊 Тест",
-            body: "Серверное уведомление работает!"
-          })
-        );
+        input {
+            border: 1px solid #ccc;
+        }
 
-        return new Response(
-          "Уведомление отправлено!",
-          {
-            headers: {
-              "Access-Control-Allow-Origin": "*"
-            }
-          }
-        );
+        .add-button {
+            border: none;
+            background: #4f7cff;
+            color: white;
+            cursor: pointer;
+        }
 
-      } catch (error) {
-        console.error("PUSH ERROR:", error);
+        .medicine {
+            background: #f0f3ff;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 10px;
+        }
 
-        return new Response(
-          "Ошибка push: " + error.message,
-          {
-            status: 500,
-            headers: {
-              "Access-Control-Allow-Origin": "*"
-            }
-          }
-        );
-      }
-    }
+        .delete-button {
+            background: #ff5c5c;
+            color: white;
+            border: none;
+            width: auto;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
 
-    return new Response("Неизвестный адрес", {
-      status: 404
+        .notification-button {
+            background: #45a049;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>💊 Моя напоминалка</h1>
+
+    <p>Добавь лекарство и время</p>
+
+    <input
+        id="medicineName"
+        type="text"
+        placeholder="Название лекарства"
+    >
+
+    <input
+        id="medicineTime"
+        type="time"
+    >
+
+    <button class="add-button" onclick="addMedicine()">
+        Добавить напоминание
+    </button>
+
+    <button class="notification-button" onclick="enableNotifications()">
+        🔔 Разрешить уведомления
+    </button>
+
+    <div id="medicineList"></div>
+
+</div>
+
+<script>
+
+const WORKER_URL =
+    "https://napominalka.kardinaltoo9.workers.dev";
+
+
+let medicines =
+    JSON.parse(localStorage.getItem("medicines")) || [];
+
+
+function showMedicines() {
+
+    const list =
+        document.getElementById("medicineList");
+
+    list.innerHTML = "";
+
+    medicines.forEach(function(medicine, index) {
+
+        const item =
+            document.createElement("div");
+
+        item.className = "medicine";
+
+        item.innerHTML =
+            "💊 " + medicine.name +
+            " — ⏰ " + medicine.time +
+            "<br>" +
+            "<button class='delete-button' onclick='deleteMedicine(" +
+            index +
+            ")'>🗑️ Удалить</button>";
+
+        list.appendChild(item);
     });
-  },
+}
 
-  async scheduled(controller, env, ctx) {
-    // Пока ничего не делаем.
-    // Сначала добьёмся сохранения подписки.
-  }
-};
+
+/* Сохранение лекарств на сервере */
+
+async function saveMedicines() {
+
+    try {
+
+        const timezone =
+            Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        const response =
+            await fetch(
+                WORKER_URL + "/medicines",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        medicines: medicines,
+                        timezone: timezone
+                    })
+                }
+            );
+
+        if (!response.ok) {
+            throw new Error(
+                "Сервер вернул ошибку: " + response.status
+            );
+        }
+
+        console.log(
+            "Напоминания отправлены на сервер"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Ошибка сохранения лекарств:",
+            error
+        );
+    }
+}
+
+
+/* Добавление лекарства */
+
+function addMedicine() {
+
+    const name =
+        document
+            .getElementById("medicineName")
+            .value
+            .trim();
+
+    const time =
+        document
+            .getElementById("medicineTime")
+            .value;
+
+    if (name === "" || time === "") {
+
+        alert(
+            "Заполни название и время"
+        );
+
+        return;
+    }
+
+    medicines.push({
+        name: name,
+        time: time
+    });
+
+    localStorage.setItem(
+        "medicines",
+        JSON.stringify(medicines)
+    );
+
+    document
+        .getElementById("medicineName")
+        .value = "";
+
+    document
+        .getElementById("medicineTime")
+        .value = "";
+
+    showMedicines();
+
+    saveMedicines();
+}
+
+
+/* Удаление лекарства */
+
+function deleteMedicine(index) {
+
+    medicines.splice(index, 1);
+
+    localStorage.setItem(
+        "medicines",
+        JSON.stringify(medicines)
+    );
+
+    showMedicines();
+
+    saveMedicines();
+}
+
+
+/* Подключение уведомлений */
+
+async function enableNotifications() {
+
+    try {
+
+        if (!("Notification" in window)) {
+
+            alert(
+                "Этот браузер не поддерживает уведомления."
+            );
+
+            return;
+        }
+
+
+        if (!("serviceWorker" in navigator)) {
+
+            alert(
+                "Service Worker не поддерживается."
+            );
+
+            return;
+        }
+
+
+        if (!("PushManager" in window)) {
+
+            alert(
+                "Push-уведомления не поддерживаются."
+            );
+
+            return;
+        }
+
+
+        /* Проверяем разрешение */
+
+        let permission =
+            Notification.permission;
+
+
+        if (permission !== "granted") {
+
+            permission =
+                await Notification.requestPermission();
+        }
+
+
+        if (permission !== "granted") {
+
+            alert(
+                "Разрешение на уведомления не получено."
+            );
+
+            return;
+        }
+
+
+        /* Регистрируем Service Worker */
+
+        const registration =
+            await navigator.serviceWorker.register(
+                "sw.js"
+            );
+
+
+        await navigator.serviceWorker.ready;
+
+
+        /* Получаем VAPID Public Key */
+
+        const keyResponse =
+            await fetch(
+                WORKER_URL + "/vapid-public-key"
+            );
+
+
+        if (!keyResponse.ok) {
+
+            throw new Error(
+                "Не удалось получить VAPID Public Key"
+            );
+        }
+
+
+        const publicKey =
+            await keyResponse.text();
+
+
+        /* Получаем существующую подписку */
+
+        let subscription =
+            await registration.pushManager.getSubscription();
+
+
+        /* Если подписки нет — создаём */
+
+        if (!subscription) {
+
+            subscription =
+                await registration.pushManager.subscribe({
+
+                    userVisibleOnly: true,
+
+                    applicationServerKey:
+                        urlBase64ToUint8Array(
+                            publicKey
+                        )
+
+                });
+        }
+
+
+        console.log(
+            "Push subscription:",
+            subscription
+        );
+
+
+        /* ВАЖНО:
+           отправляем подписку на сервер
+           даже если она уже существовала */
+
+        const saveResponse =
+            await fetch(
+                WORKER_URL + "/subscribe",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body:
+                        JSON.stringify(
+                            subscription
+                        )
+                }
+            );
+
+
+        if (!saveResponse.ok) {
+
+            const errorText =
+                await saveResponse.text();
+
+            throw new Error(
+                "Ошибка /subscribe: " +
+                errorText
+            );
+        }
+
+
+        /* Заодно отправляем лекарства */
+
+        await saveMedicines();
+
+
+        alert(
+            "Уведомления подключены! 🔔"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Ошибка подключения уведомлений:",
+            error
+        );
+
+        alert(
+            "Ошибка подключения уведомлений.\n\n" +
+            error.message
+        );
+    }
+}
+
+
+/* Преобразование VAPID ключа */
+
+function urlBase64ToUint8Array(
+    base64String
+) {
+
+    const padding =
+        "=".repeat(
+            (4 - base64String.length % 4) % 4
+        );
+
+    const base64 =
+        (
+            base64String +
+            padding
+        )
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+
+    const rawData =
+        window.atob(base64);
+
+    const outputArray =
+        new Uint8Array(
+            rawData.length
+        );
+
+    for (
+        let i = 0;
+        i < rawData.length;
+        i++
+    ) {
+
+        outputArray[i] =
+            rawData.charCodeAt(i);
+    }
+
+    return outputArray;
+}
+
+
+/* Показываем сохранённые лекарства */
+
+showMedicines();
+
+</script>
+
+</body>
+</html>
