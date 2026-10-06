@@ -130,6 +130,14 @@ export default {
           hour12: false
         }).format(now);
       // Сегодняшняя дата пользователя
+     await env.REMINDERS.put(
+  "cron-debug",
+  JSON.stringify({
+    now: new Date().toISOString(),
+    timezone: timezone,
+    localTime: localTime
+  })
+);
       const localDate =
         new Intl.DateTimeFormat("en-CA", {
           timeZone: timezone,
