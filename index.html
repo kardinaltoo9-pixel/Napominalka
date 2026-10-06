@@ -103,16 +103,21 @@
 let medicines =
     JSON.parse(localStorage.getItem("medicines")) || [];
 
+const WORKER_URL =
+    "napominalka.kardinaltoo9.workers.dev";
+
 
 function showMedicines() {
 
-    let list = document.getElementById("medicineList");
+    let list =
+        document.getElementById("medicineList");
 
     list.innerHTML = "";
 
     medicines.forEach(function(medicine, index) {
 
-        let item = document.createElement("div");
+        let item =
+            document.createElement("div");
 
         item.className = "medicine";
 
@@ -179,9 +184,7 @@ async function enableNotifications() {
 
     if (!("Notification" in window)) {
 
-        alert(
-            "Этот браузер не поддерживает уведомления."
-        );
+        alert("Этот браузер не поддерживает уведомления.");
 
         return;
     }
@@ -189,9 +192,7 @@ async function enableNotifications() {
 
     if (!("serviceWorker" in navigator)) {
 
-        alert(
-            "Service Worker не поддерживается."
-        );
+        alert("Service Worker не поддерживается.");
 
         return;
     }
@@ -199,9 +200,7 @@ async function enableNotifications() {
 
     if (!("PushManager" in window)) {
 
-        alert(
-            "Push-уведомления не поддерживаются."
-        );
+        alert("Push-уведомления не поддерживаются.");
 
         return;
     }
@@ -213,9 +212,7 @@ async function enableNotifications() {
 
     if (permission !== "granted") {
 
-        alert(
-            "Разрешение на уведомления не получено."
-        );
+        alert("Разрешение на уведомления не получено.");
 
         return;
     }
@@ -227,15 +224,10 @@ async function enableNotifications() {
             await navigator.serviceWorker.register("sw.js");
 
 
-        /*
-         * ВАЖНО:
-         * сюда позже поставим настоящий адрес
-         * твоего Cloudflare Worker.
-         */
-
-        const response = await fetch(
-            "napominalka.kardinaltoo9.workers.dev/vapid-public-key"
-        );
+        const response =
+            await fetch(
+                WORKER_URL + "/vapid-public-key"
+            );
 
 
         if (!response.ok) {
@@ -265,6 +257,30 @@ async function enableNotifications() {
             "Push-подписка создана:",
             subscription
         );
+
+
+        const saveResponse =
+            await fetch(
+                WORKER_URL + "/subscribe",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body:
+                        JSON.stringify(subscription)
+                }
+            );
+
+
+        if (!saveResponse.ok) {
+
+            throw new Error(
+                "Не удалось сохранить подписку"
+            );
+        }
 
 
         alert(
@@ -324,7 +340,8 @@ function urlBase64ToUint8Array(base64String) {
 
 function checkMedicines() {
 
-    let now = new Date();
+    let now =
+        new Date();
 
     let currentTime =
         String(now.getHours()).padStart(2, "0") +
