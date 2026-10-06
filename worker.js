@@ -99,6 +99,10 @@ export default {
   },
   // Автоматическая проверка каждую минуту
   async scheduled(controller, env, ctx) {
+  await env.REMINDERS.put(
+  "cron-test",
+  new Date().toISOString()
+);
     try {
       const subscriptionData =
         await env.REMINDERS.get("subscription");
