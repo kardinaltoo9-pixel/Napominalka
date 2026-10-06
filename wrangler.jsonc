@@ -10,5 +10,10 @@
       "binding": "REMINDERS",
       "id": "c3fbac6b269d4b5cb908984a78c5f7cd"
     }
-  ]
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }
