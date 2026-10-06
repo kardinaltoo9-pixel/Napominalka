@@ -75,9 +75,16 @@
 
     <p>Добавь лекарство и время</p>
 
-    <input id="medicineName" type="text" placeholder="Название лекарства">
+    <input
+        id="medicineName"
+        type="text"
+        placeholder="Название лекарства"
+    >
 
-    <input id="medicineTime" type="time">
+    <input
+        id="medicineTime"
+        type="time"
+    >
 
     <button class="add-button" onclick="addMedicine()">
         Добавить напоминание
@@ -93,7 +100,9 @@
 
 <script>
 
-let medicines = JSON.parse(localStorage.getItem("medicines")) || [];
+let medicines =
+    JSON.parse(localStorage.getItem("medicines")) || [];
+
 
 function showMedicines() {
 
@@ -110,20 +119,28 @@ function showMedicines() {
         item.innerHTML =
             "💊 " + medicine.name +
             " — ⏰ " + medicine.time +
-            "<br><button class='delete-button' onclick='deleteMedicine(" +
-            index + ")'>🗑️ Удалить</button>";
+            "<br>" +
+            "<button class='delete-button' onclick='deleteMedicine(" +
+            index +
+            ")'>🗑️ Удалить</button>";
 
         list.appendChild(item);
     });
 }
 
+
 function addMedicine() {
 
-    let name = document.getElementById("medicineName").value;
-    let time = document.getElementById("medicineTime").value;
+    let name =
+        document.getElementById("medicineName").value;
+
+    let time =
+        document.getElementById("medicineTime").value;
 
     if (name === "" || time === "") {
+
         alert("Заполни название и время");
+
         return;
     }
 
@@ -132,41 +149,178 @@ function addMedicine() {
         time: time
     });
 
-    localStorage.setItem("medicines", JSON.stringify(medicines));
+    localStorage.setItem(
+        "medicines",
+        JSON.stringify(medicines)
+    );
 
     document.getElementById("medicineName").value = "";
+
     document.getElementById("medicineTime").value = "";
 
     showMedicines();
 }
 
+
 function deleteMedicine(index) {
 
     medicines.splice(index, 1);
 
-    localStorage.setItem("medicines", JSON.stringify(medicines));
+    localStorage.setItem(
+        "medicines",
+        JSON.stringify(medicines)
+    );
 
     showMedicines();
 }
 
-function enableNotifications() {
 
-    if ("Notification" in window) {
+async function enableNotifications() {
 
-        Notification.requestPermission().then(function(permission) {
+    if (!("Notification" in window)) {
 
-            if (permission === "granted") {
-                alert("Уведомления разрешены! 🔔");
-            } else {
-                alert("Уведомления запрещены.");
-            }
+        alert(
+            "Этот браузер не поддерживает уведомления."
+        );
 
-        });
+        return;
+    }
 
-    } else {
-        alert("Этот браузер не поддерживает уведомления.");
+
+    if (!("serviceWorker" in navigator)) {
+
+        alert(
+            "Service Worker не поддерживается."
+        );
+
+        return;
+    }
+
+
+    if (!("PushManager" in window)) {
+
+        alert(
+            "Push-уведомления не поддерживаются."
+        );
+
+        return;
+    }
+
+
+    const permission =
+        await Notification.requestPermission();
+
+
+    if (permission !== "granted") {
+
+        alert(
+            "Разрешение на уведомления не получено."
+        );
+
+        return;
+    }
+
+
+    try {
+
+        const registration =
+            await navigator.serviceWorker.register("sw.js");
+
+
+        /*
+         * ВАЖНО:
+         * сюда позже поставим настоящий адрес
+         * твоего Cloudflare Worker.
+         */
+
+        const response = await fetch(
+            "napominalka.kardinaltoo9.workers.dev/vapid-public-key"
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Не удалось получить Public Key"
+            );
+        }
+
+
+        const publicKey =
+            await response.text();
+
+
+        const subscription =
+            await registration.pushManager.subscribe({
+
+                userVisibleOnly: true,
+
+                applicationServerKey:
+                    urlBase64ToUint8Array(publicKey)
+
+            });
+
+
+        console.log(
+            "Push-подписка создана:",
+            subscription
+        );
+
+
+        alert(
+            "Уведомления подключены! 🔔"
+        );
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(
+            "Не получилось подключить уведомления."
+        );
     }
 }
+
+
+function urlBase64ToUint8Array(base64String) {
+
+    const padding =
+        "=".repeat(
+            (4 - base64String.length % 4) % 4
+        );
+
+    const base64 =
+        (
+            base64String +
+            padding
+        )
+        .replace(/-/g, "+")
+        .replace(/_/g, "/");
+
+
+    const rawData =
+        window.atob(base64);
+
+
+    const outputArray =
+        new Uint8Array(rawData.length);
+
+
+    for (
+        let i = 0;
+        i < rawData.length;
+        ++i
+    ) {
+
+        outputArray[i] =
+            rawData.charCodeAt(i);
+    }
+
+
+    return outputArray;
+}
+
 
 function checkMedicines() {
 
@@ -177,27 +331,37 @@ function checkMedicines() {
         ":" +
         String(now.getMinutes()).padStart(2, "0");
 
+
     medicines.forEach(function(medicine) {
 
         if (medicine.time === currentTime) {
 
-            if (Notification.permission === "granted") {
+            if (
+                "Notification" in window &&
+                Notification.permission === "granted"
+            ) {
 
-                new Notification("💊 Напоминание", {
-                    body: "Пора принять: " + medicine.name
-                });
-
+                new Notification(
+                    "💊 Напоминание",
+                    {
+                        body:
+                            "Пора принять: " +
+                            medicine.name
+                    }
+                );
             }
-
         }
-
     });
-
 }
+
 
 showMedicines();
 
-setInterval(checkMedicines, 30000);
+
+setInterval(
+    checkMedicines,
+    30000
+);
 
 </script>
 
